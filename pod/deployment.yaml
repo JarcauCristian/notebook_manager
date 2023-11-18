@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:
+  namespace: cjarcau
+  labels:
+    app:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app:
+  template:
+    metadata:
+      labels:
+        app:
+    spec:
+      containers:
+      - name:
+        image: scr4pp/notebook
+        env:
+        - name: JUPYTER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: jupyter_token
+        ports:
+        - containerPort: 8888

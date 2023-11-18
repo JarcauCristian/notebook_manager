@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name:
+  namespace: cjarcau
+spec:
+  selector:
+    app.kubernetes.io/name:
+  ports:
+    - protocol: TCP
+      port:
+      targetPort: 8888
