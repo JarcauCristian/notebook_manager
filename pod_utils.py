@@ -53,7 +53,7 @@ def create_service(uid: str, namespace: str):
 
         yaml_content["metadata"]["name"] = f"service-{uid}"
         yaml_content["spec"]["ports"][0]["port"] = unused_port
-        yaml_content["spec"]["selector"]["app.kubernetes.io/name"] = uid
+        yaml_content["spec"]["selector"]["app"] = uid
 
         return yaml_content, unused_port
     else:

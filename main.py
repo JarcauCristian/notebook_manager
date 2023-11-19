@@ -10,7 +10,7 @@ from kubernetes.client.rest import ApiException
 from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean
+from sqlalchemy import create_engine, Column, String, DateTime
 
 app = FastAPI()
 Base = declarative_base()
@@ -26,7 +26,7 @@ class MyTable(Base):
     __tablename__ = "notebooks"
     notebook_id = Column(String, primary_key=True)
     user_id = Column(String)
-    done = Column(Boolean)
+    last_accessed = Column(DateTime)
     created_at = Column(DateTime)
 
 
@@ -39,12 +39,12 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/main_api")
 async def connection_test():
     return JSONResponse("Server Works!", status_code=200)
 
 
-@app.put("/create_notebook_instance")
+@app.put("/main_api/create_notebook_instance")
 async def create_notebook_instance(user_id: str):
     config.load_incluster_config()
     apps_v1_api = client.AppsV1Api()
@@ -88,7 +88,8 @@ async def create_notebook_instance(user_id: str):
 
     session = Session()
 
-    new_record = MyTable(user_id=user_id, notebook_id=uid, done=False, created_at=datetime.datetime.now())
+    new_record = MyTable(user_id=user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
+                         created_at=datetime.datetime.now())
     session.add(new_record)
     session.commit()
 
@@ -102,7 +103,7 @@ async def create_notebook_instance(user_id: str):
     return JSONResponse(content=return_data, status_code=201)
 
 
-@app.get("/get_notebook_details")
+@app.get("/main_api/get_notebook_details")
 async def get_notebook_details(user_id: str):
     config.load_incluster_config()
 

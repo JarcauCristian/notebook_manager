@@ -5,7 +5,7 @@ metadata:
   namespace: cjarcau
 spec:
   selector:
-    app.kubernetes.io/name:
+    app:
   ports:
     - protocol: TCP
       port:
