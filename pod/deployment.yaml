@@ -24,5 +24,20 @@ spec:
             secretKeyRef:
               name:
               key: jupyter_token
+        - name: NOTEBOOK_ID
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: notebook_id
+        - name: SERVICE_NAME
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: service_name
+        - name: SERVICE_PORT
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: service_port
         ports:
         - containerPort: 8888

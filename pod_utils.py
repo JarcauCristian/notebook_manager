@@ -23,6 +23,12 @@ def create_deployment(uid: str):
     yaml_content["spec"]["template"]["spec"]["containers"][0]["name"] = uid
     yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][0]["valueFrom"]["secretKeyRef"]["name"] = \
         f"secret-{uid}"
+    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][1]["valueFrom"]["secretKeyRef"]["name"] = \
+        f"secret-{uid}"
+    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][2]["valueFrom"]["secretKeyRef"]["name"] = \
+        f"secret-{uid}"
+    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][3]["valueFrom"]["secretKeyRef"]["name"] = \
+        f"secret-{uid}"
 
     return yaml_content
 
@@ -68,8 +74,21 @@ def create_secret(uid: str):
 
         yaml_content["metadata"]["name"] = f"secret-{uid}"
         encoded_bytes = base64.b64encode(generated_password.encode('utf-8'))
-        encoded_string = encoded_bytes.decode('utf-8')
-        yaml_content["data"]["jupyter_token"] = encoded_string
+        encoded_jupyter_token = encoded_bytes.decode('utf-8')
+        yaml_content["data"]["jupyter_token"] = encoded_jupyter_token
+
+        encoded_notebook_id_bytes = base64.b64encode(uid.encode('utf-8'))
+        encoded_notebook_id = encoded_notebook_id_bytes.decode('utf-8')
+        yaml_content["data"]["notebook_id"] = encoded_notebook_id
+
+        encoded_service_name_bytes = base64.b64encode("api-deleter-service".encode('utf-8'))
+        encoded_service_name = encoded_service_name_bytes.decode('utf-8')
+        yaml_content["data"]["service_name"] = encoded_service_name
+
+        port = 49153
+        encoded_service_port_bytes = base64.b64encode(port.to_bytes(5, byteorder="big").decode("utf-8").encode("utf-8"))
+        encoded_service_port = encoded_service_port_bytes.decode('utf-8')
+        yaml_content["data"]["service_port"] = encoded_service_port
 
     return yaml_content, generated_password
 
