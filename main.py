@@ -32,9 +32,9 @@ class MyTable(Base):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["localhost"],  # Allows all origins
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
+    allow_methods=["GET", "POST", "PUT"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
 
@@ -140,6 +140,18 @@ async def get_notebook_details(user_id: str):
     session.close()
 
     return JSONResponse(content=return_data, status_code=200)
+
+
+@app.post("/main_api/update_access")
+async def update_access(uid: str):
+    session = Session()
+
+    result = session.query(MyTable).filter(MyTable.notebook_id == uid).all()
+    result[0].last_accessed = datetime.datetime.now()
+
+    session.commit()
+    session.close()
+    return JSONResponse(content="Update Access Successfully!", status_code=200)
 
 
 if __name__ == '__main__':
