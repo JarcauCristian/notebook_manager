@@ -28,6 +28,7 @@ class MyTable(Base):
     user_id = Column(String)
     last_accessed = Column(DateTime)
     created_at = Column(DateTime)
+    description = Column(String)
 
 
 app.add_middleware(
@@ -45,7 +46,7 @@ async def connection_test():
 
 
 @app.put("/main_api/create_notebook_instance")
-async def create_notebook_instance(user_id: str):
+async def create_notebook_instance(user_id: str, description: str):
     config.load_incluster_config()
     apps_v1_api = client.AppsV1Api()
     core_v1_api = client.CoreV1Api()
@@ -64,32 +65,33 @@ async def create_notebook_instance(user_id: str):
         core_v1_api.create_namespaced_service(namespace=namespace, body=service_body)
         networking_v1_api.create_namespaced_ingress(namespace=namespace, body=ingress_body)
     except ApiException as e:
+        print(f"Error creating pod {e}")
         try:
             networking_v1_api.delete_namespaced_ingress(namespace=namespace, name=f"ingress-{uid}")
         except ApiException as e:
-            print("Resource does not exist!")
+            print(f"Resource does not exist! {e}")
 
         try:
             core_v1_api.delete_namespaced_service(namespace=namespace, name=f"service-{uid}")
         except ApiException as e:
-            print("Resource does not exist!")
+            print(f"Resource does not exist! {e}")
 
         try:
             apps_v1_api.delete_namespaced_deployment(namespace=namespace, name=f"deployment-{uid}")
         except ApiException as e:
-            print("Resource does not exist!")
+            print(f"Resource does not exist! {e}")
 
         try:
             core_v1_api.delete_namespaced_secret(namespace=namespace, name=f"secret-{uid}")
         except ApiException as e:
-            print("Resource does not exist!")
+            print(f"Resource does not exist! {e}")
 
         return JSONResponse(content="Could not make notebook!", status_code=500)
 
     session = Session()
 
     new_record = MyTable(user_id=user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
-                         created_at=datetime.datetime.now())
+                         created_at=datetime.datetime.now(), description=description)
     session.add(new_record)
     session.commit()
 
@@ -132,7 +134,9 @@ async def get_notebook_details(user_id: str):
         data = {
             "notebook_id": notebook_id,
             "creation_time": format_creation_timestamp,
-            "expiration_time": format_expiration_timestamp
+            "expiration_time": format_expiration_timestamp,
+            "last_accessed": instance.last_accessed,
+            "description": instance.description
         }
 
         return_data.append(data)
