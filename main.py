@@ -47,7 +47,7 @@ async def connection_test():
 
 
 @app.put("/main_api/create_notebook_instance")
-async def create_notebook_instance(user_id: str, description: str, authorization: str = Header(None)):
+async def create_notebook_instance(user_id: str, description: str, dataset_url: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
@@ -62,7 +62,7 @@ async def create_notebook_instance(user_id: str, description: str, authorization
             uid = str(uuid4())
             deployment_body = create_deployment(uid)
             service_body, service_port = create_service(uid, namespace=namespace)
-            secret_body, password = create_secret(uid)
+            secret_body, password = create_secret(uid, dataset_url)
             ingress_body = create_ingress(uid, service_port)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)

@@ -29,6 +29,8 @@ def create_deployment(uid: str):
         f"secret-{uid}"
     yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][3]["valueFrom"]["secretKeyRef"]["name"] = \
         f"secret-{uid}"
+    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][4]["valueFrom"]["secretKeyRef"]["name"] = \
+        f"secret-{uid}"
 
     return yaml_content
 
@@ -66,7 +68,7 @@ def create_service(uid: str, namespace: str):
         return None
 
 
-def create_secret(uid: str):
+def create_secret(uid: str, dataset_url: str):
     generated_password = generate_password(12)
 
     with open("pod/secret.yaml") as file:
@@ -89,6 +91,10 @@ def create_secret(uid: str):
         encoded_service_port_bytes = base64.b64encode(port.to_bytes(5, byteorder="big").decode("utf-8").encode("utf-8"))
         encoded_service_port = encoded_service_port_bytes.decode('utf-8')
         yaml_content["data"]["service_port"] = encoded_service_port
+
+        encoded_dataset_url_bytes = base64.b64encode(generated_password.encode('utf-8'))
+        encoded_dataset_url = encoded_dataset_url_bytes.decode('utf-8')
+        yaml_content["data"]["dataset_url"] = encoded_dataset_url
 
     return yaml_content, generated_password
 
