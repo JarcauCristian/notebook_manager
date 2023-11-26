@@ -190,7 +190,7 @@ async def update_access(uid: str, authorization: str = Header(None)):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.delete("main_api/delete_notebook")
+@app.delete("/main_api/delete_notebook")
 async def delete_notebook(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
