@@ -34,15 +34,12 @@ spec:
             secretKeyRef:
               name:
               key: service_name
-        - name: SERVICE_PORT
-          valueFrom:
-            secretKeyRef:
-              name:
-              key: service_port
         - name: DATASET_URL
           valueFrom:
             secretKeyRef:
               name:
               key: dataset_url
+        - name: SERVICE_PORT
+          value: 49153
         ports:
         - containerPort: 8888
