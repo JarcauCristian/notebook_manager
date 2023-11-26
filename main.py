@@ -153,7 +153,7 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
                     "notebook_id": notebook_id,
                     "creation_time": format_creation_timestamp,
                     "expiration_time": format_expiration_timestamp,
-                    "last_accessed": instance.last_accessed,
+                    "last_accessed": instance.last_accessed.strftime("%m/%d/%Y"),
                     "description": instance.description
                 }
 
