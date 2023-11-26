@@ -141,10 +141,10 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
                                                                         namespace=namespace)
 
                     creation_timestamp = deployment.metadata.creation_timestamp
-                    format_creation_timestamp = creation_timestamp.isoformat()
+                    format_creation_timestamp = creation_timestamp.strftime("%m/%d/%Y")
 
                     expiration_time = creation_timestamp + datetime.timedelta(days=10)
-                    format_expiration_timestamp = expiration_time.isoformat()
+                    format_expiration_timestamp = expiration_time.strftime("%m/%d/%Y")
 
                 except client.exceptions.ApiException as e:
                     return JSONResponse(content="Exception when calling Kubernetes API: %s\n" % e, status_code=500)

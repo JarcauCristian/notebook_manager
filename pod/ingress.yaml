@@ -9,8 +9,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-  - host: localhost
-    http:
+  - http:
       paths:
       - path:
         pathType: Prefix
