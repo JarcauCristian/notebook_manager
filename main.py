@@ -51,7 +51,7 @@ async def create_notebook_instance(user_id: str, description: str, dataset_url: 
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
+        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
 
         if response.status_code == 200:
             config.load_incluster_config()
@@ -121,7 +121,7 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
+        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
 
         if response.status_code == 200:
             config.load_incluster_config()
@@ -173,7 +173,7 @@ async def update_access(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
+        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
 
         if response.status_code == 200:
             session = Session()
@@ -195,7 +195,7 @@ async def delete_notebook(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
+        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
 
         if response.status_code == 200:
             config.load_incluster_config()
