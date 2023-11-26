@@ -40,6 +40,6 @@ spec:
               name:
               key: dataset_url
         - name: SERVICE_PORT
-          value: 49153
+          value: "49153"
         ports:
         - containerPort: 8888
