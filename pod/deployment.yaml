@@ -39,6 +39,11 @@ spec:
             secretKeyRef:
               name:
               key: dataset_url
+        - name: USER_ID
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: user_id
         - name: SERVICE_PORT
           value: "49153"
         ports:

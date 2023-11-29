@@ -62,7 +62,7 @@ async def create_notebook_instance(user_id: str, description: str, dataset_url: 
             uid = str(uuid4())
             deployment_body = create_deployment(uid)
             service_body, service_port = create_service(uid, namespace=namespace)
-            secret_body, password = create_secret(uid, dataset_url)
+            secret_body, password = create_secret(uid, dataset_url, user_id)
             ingress_body = create_ingress(uid, service_port)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)
