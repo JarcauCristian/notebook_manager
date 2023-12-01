@@ -3,13 +3,10 @@ kind: Ingress
 metadata:
   name:
   namespace: cjarcau
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "86400"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-  - http:
+  - host: equipped-woodcock-needlessly.ngrok-free.app
+    http:
       paths:
       - path:
         pathType: Prefix
@@ -18,4 +15,4 @@ spec:
             name:
             port:
               number:
-  ingressClassName: nginx
+  ingressClassName: ngrok
