@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Header
 import datetime
 import requests
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from pod_utils import create_service, create_deployment, create_secret, create_ingress
 from kubernetes import client, config
@@ -41,13 +42,19 @@ app.add_middleware(
 )
 
 
+class NotebookInstance(BaseModel):
+    user_id: str
+    description: str
+    dataset_url: str
+
+
 @app.get("/main_api")
 async def connection_test():
     return JSONResponse("Server Works!", status_code=200)
 
 
 @app.put("/main_api/create_notebook_instance")
-async def create_notebook_instance(user_id: str, description: str, dataset_url: str, authorization: str = Header(None)):
+async def create_notebook_instance(notebook_instance: NotebookInstance, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
@@ -62,7 +69,7 @@ async def create_notebook_instance(user_id: str, description: str, dataset_url: 
             uid = str(uuid4())
             deployment_body = create_deployment(uid)
             service_body, service_port = create_service(uid, namespace=namespace)
-            secret_body, password = create_secret(uid, dataset_url, user_id)
+            secret_body, password = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id)
             ingress_body = create_ingress(uid, service_port)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)
@@ -97,8 +104,8 @@ async def create_notebook_instance(user_id: str, description: str, dataset_url: 
 
             session = Session()
 
-            new_record = MyTable(user_id=user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
-                                 created_at=datetime.datetime.now(), description=description)
+            new_record = MyTable(user_id=notebook_instance.user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
+                                 created_at=datetime.datetime.now(), description=notebook_instance.description)
             session.add(new_record)
             session.commit()
 
