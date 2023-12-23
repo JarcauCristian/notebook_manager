@@ -6,13 +6,15 @@ import datetime
 import requests
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from pod_utils import create_service, create_deployment, create_secret, create_ingress
+from pod_utils import create_service, create_deployment, create_secret
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import create_engine, Column, String, DateTime
+from sqlalchemy import create_engine, Column, String, DateTime, Integer
+
+from redis_cache import is_data_stale, get_data_from_redis, set_data_in_redis, update_timestamp
 
 app = FastAPI()
 Base = declarative_base()
@@ -31,6 +33,7 @@ class MyTable(Base):
     last_accessed = Column(DateTime)
     created_at = Column(DateTime)
     description = Column(String)
+    port = Column(Integer)
 
 
 app.add_middleware(
@@ -64,27 +67,19 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             config.load_incluster_config()
             apps_v1_api = client.AppsV1Api()
             core_v1_api = client.CoreV1Api()
-            networking_v1_api = client.NetworkingV1Api()
 
             uid = str(uuid4())
             deployment_body = create_deployment(uid)
             service_body, service_port = create_service(uid, namespace=namespace)
             secret_body, password = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id)
-            ingress_body = create_ingress(uid, service_port)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)
             try:
                 core_v1_api.create_namespaced_secret(namespace=namespace, body=secret_body)
                 apps_v1_api.create_namespaced_deployment(namespace=namespace, body=deployment_body)
                 core_v1_api.create_namespaced_service(namespace=namespace, body=service_body)
-                networking_v1_api.create_namespaced_ingress(namespace=namespace, body=ingress_body)
             except ApiException as e:
                 print(f"Error creating pod {e}")
-                try:
-                    networking_v1_api.delete_namespaced_ingress(namespace=namespace, name=f"ingress-{uid}")
-                except ApiException as e:
-                    print(f"Resource does not exist! {e}")
-
                 try:
                     core_v1_api.delete_namespaced_service(namespace=namespace, name=f"service-{uid}")
                 except ApiException as e:
@@ -130,13 +125,22 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
 
         response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
 
-        if response.status_code == 200:
-            config.load_incluster_config()
+        if response.status_code != 200:
+            return JSONResponse(content="Unauthorized access!", status_code=401)
 
-            apps_v1_api = client.AppsV1Api()
+        cache_key = f"user_{user_id}_notebook_details"
+        if not is_data_stale(cache_key, 3600):  # assuming you want a 1-hour expiration
+            cached_data = get_data_from_redis(cache_key)
+            if cached_data:
+                return JSONResponse(content=cached_data, status_code=200)
 
-            session = Session()
+        config.load_incluster_config()
 
+        apps_v1_api = client.AppsV1Api()
+
+        session = Session()
+
+        try:
             instances = session.query(MyTable).filter(MyTable.user_id == user_id).all()
 
             return_data = []
@@ -161,16 +165,20 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
                     "creation_time": format_creation_timestamp,
                     "expiration_time": format_expiration_timestamp,
                     "last_accessed": instance.last_accessed.strftime("%m/%d/%Y"),
-                    "description": instance.description
+                    "description": instance.description,
+                    "port": instance.port
                 }
-
                 return_data.append(data)
 
-            session.close()
+            set_data_in_redis(cache_key, return_data, 3600)
+            update_timestamp(cache_key)
 
             return JSONResponse(content=return_data, status_code=200)
-        else:
-            return JSONResponse(content="Unauthorized access!", status_code=401)
+
+        except client.exceptions.ApiException as e:
+            return JSONResponse(content=f"Exception when calling Kubernetes API: {e}", status_code=500)
+        finally:
+            session.close()
     else:
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
@@ -221,11 +229,6 @@ async def delete_notebook(uid: str, authorization: str = Header(None)):
                 return JSONResponse(content="Failed to delete notebook!", status_code=500)
 
             session.close()
-
-            try:
-                networking_v1_api.delete_namespaced_ingress(namespace=namespace, name=f"ingress-{uid}")
-            except ApiException as e:
-                print(f"Resource does not exist! {e}")
 
             try:
                 core_v1_api.delete_namespaced_service(namespace=namespace, name=f"service-{uid}")
