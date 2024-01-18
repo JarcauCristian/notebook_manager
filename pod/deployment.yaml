@@ -19,11 +19,6 @@ spec:
       - name:
         image: scr4pp/notebook
         env:
-        - name: JUPYTER_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name:
-              key: jupyter_token
         - name: NOTEBOOK_ID
           valueFrom:
             secretKeyRef:
