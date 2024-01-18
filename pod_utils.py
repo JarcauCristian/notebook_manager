@@ -69,15 +69,14 @@ def create_service(uid: str, namespace: str):
 
 
 def create_secret(uid: str, dataset_url: str, user_id: str):
-    generated_password = generate_password(12)
-
     with open("pod/secret.yaml") as file:
         yaml_content = yaml.safe_load(file)
 
         yaml_content["metadata"]["name"] = f"secret-{uid}"
-        encoded_bytes = base64.b64encode(generated_password.encode('utf-8'))
-        encoded_jupyter_token = encoded_bytes.decode('utf-8')
-        yaml_content["data"]["jupyter_token"] = encoded_jupyter_token
+
+        # encoded_bytes = base64.b64encode(generated_password.encode('utf-8'))
+        # encoded_jupyter_token = encoded_bytes.decode('utf-8')
+        # yaml_content["data"]["jupyter_token"] = encoded_jupyter_token
 
         encoded_notebook_id_bytes = base64.b64encode(uid.encode('utf-8'))
         encoded_notebook_id = encoded_notebook_id_bytes.decode('utf-8')
@@ -95,7 +94,7 @@ def create_secret(uid: str, dataset_url: str, user_id: str):
         encoded_user_id_token = encoded_user_id_bytes.decode('utf-8')
         yaml_content["data"]["user_id"] = encoded_user_id_token
 
-    return yaml_content, generated_password
+    return yaml_content
 
 
 def create_ingress(uid: str, port: int):

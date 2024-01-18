@@ -51,12 +51,12 @@ class NotebookInstance(BaseModel):
     dataset_url: str
 
 
-@app.get("/main_api")
+@app.get("/")
 async def connection_test():
     return JSONResponse("Server Works!", status_code=200)
 
 
-@app.put("/main_api/create_notebook_instance")
+@app.post("/create_notebook_instance", tags=["POST"])
 async def create_notebook_instance(notebook_instance: NotebookInstance, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -71,7 +71,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             uid = str(uuid4())
             deployment_body = create_deployment(uid)
             service_body, service_port = create_service(uid, namespace=namespace)
-            secret_body, password = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id)
+            secret_body = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)
             try:
@@ -100,7 +100,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             session = Session()
 
             new_record = MyTable(user_id=notebook_instance.user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
-                                 created_at=datetime.datetime.now(), description=notebook_instance.description)
+                                 created_at=datetime.datetime.now(), description=notebook_instance.description, port=service_port)
             session.add(new_record)
             session.commit()
 
@@ -108,7 +108,6 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
 
             return_data = {
                 "notebook_id": uid,
-                "notebook_password": password
             }
 
             return JSONResponse(content=return_data, status_code=201)
@@ -118,7 +117,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.get("/main_api/get_notebook_details")
+@app.get("/get_notebook_details", tags=["GET"])
 async def get_notebook_details(user_id: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -183,7 +182,7 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.post("/main_api/update_access")
+@app.put("/update_access", tags=["PUT"])
 async def update_access(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -205,7 +204,7 @@ async def update_access(uid: str, authorization: str = Header(None)):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.delete("/main_api/delete_notebook")
+@app.delete("/delete_notebook", tags=["DELETE"])
 async def delete_notebook(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
