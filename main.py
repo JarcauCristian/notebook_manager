@@ -34,6 +34,7 @@ class MyTable(Base):
     created_at = Column(DateTime)
     description = Column(String)
     port = Column(Integer)
+    notebook_type = Column(String)
 
 
 app.add_middleware(
@@ -49,6 +50,7 @@ class NotebookInstance(BaseModel):
     user_id: str
     description: str
     dataset_url: str
+    notebook_type: str
 
 
 @app.get("/")
@@ -100,7 +102,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             session = Session()
 
             new_record = MyTable(user_id=notebook_instance.user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
-                                 created_at=datetime.datetime.now(), description=notebook_instance.description, port=service_port)
+                                 created_at=datetime.datetime.now(), description=notebook_instance.description, port=service_port, notebook_type=notebook_instance.notebook_type)
             session.add(new_record)
             session.commit()
 
