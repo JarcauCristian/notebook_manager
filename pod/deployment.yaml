@@ -42,6 +42,6 @@ spec:
         - name: SERVICE_PORT
           value: "49153"
         - name: API
-          value: "http://go-api-service:49151"
+          value: "http://go-api-service:49151/get/object"
         ports:
         - containerPort: 8888
