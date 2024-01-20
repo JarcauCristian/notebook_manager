@@ -41,5 +41,7 @@ spec:
               key: user_id
         - name: SERVICE_PORT
           value: "49153"
+        - name: API
+          value: "http://go-api-service:49151"
         ports:
         - containerPort: 8888

@@ -74,10 +74,6 @@ def create_secret(uid: str, dataset_url: str, user_id: str):
 
         yaml_content["metadata"]["name"] = f"secret-{uid}"
 
-        # encoded_bytes = base64.b64encode(generated_password.encode('utf-8'))
-        # encoded_jupyter_token = encoded_bytes.decode('utf-8')
-        # yaml_content["data"]["jupyter_token"] = encoded_jupyter_token
-
         encoded_notebook_id_bytes = base64.b64encode(uid.encode('utf-8'))
         encoded_notebook_id = encoded_notebook_id_bytes.decode('utf-8')
         yaml_content["data"]["notebook_id"] = encoded_notebook_id
