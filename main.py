@@ -108,6 +108,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
 
             return_data = {
                 "notebook_id": uid,
+                "port": service_port
             }
 
             return JSONResponse(content=return_data, status_code=201)
