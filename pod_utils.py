@@ -12,7 +12,7 @@ def generate_password(length: int):
     return generated_password
 
 
-def create_deployment(uid: str):
+def create_deployment(uid: str, notebook_type: str):
     with open("pod/deployment.yaml") as file:
         yaml_content = yaml.safe_load(file)
 
@@ -21,6 +21,12 @@ def create_deployment(uid: str):
     yaml_content["spec"]["selector"]["matchLabels"]["app"] = uid
     yaml_content["spec"]["template"]["metadata"]["labels"]["app"] = uid
     yaml_content["spec"]["template"]["spec"]["containers"][0]["name"] = uid
+
+    if notebook_type == "sklearn":
+        yaml_content["spec"]["template"]["spec"]["containers"][0]["image"] = "scr4pp/notebook"
+    elif notebook_type == "pytorch":
+        yaml_content["spec"]["template"]["spec"]["containers"][0]["image"] = "scr4pp/notebook-pytorch"
+
     yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][0]["valueFrom"]["secretKeyRef"]["name"] = \
         f"secret-{uid}"
     yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][1]["valueFrom"]["secretKeyRef"]["name"] = \

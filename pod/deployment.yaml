@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name:
-        image: scr4pp/notebook
+        image:
         env:
         - name: NOTEBOOK_ID
           valueFrom:

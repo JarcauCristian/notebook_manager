@@ -13,7 +13,6 @@ from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import create_engine, Column, String, DateTime, Integer
-
 from redis_cache import is_data_stale, get_data_from_redis, set_data_in_redis, update_timestamp
 
 app = FastAPI()
@@ -70,8 +69,11 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             apps_v1_api = client.AppsV1Api()
             core_v1_api = client.CoreV1Api()
 
+            if notebook_instance.notebook_type not in ["sklearn", "pytorch"]:
+                return JSONResponse(status_code=400, content="Notebook Type can be only sklearn or pytorch!")
+
             uid = str(uuid4())
-            deployment_body = create_deployment(uid)
+            deployment_body = create_deployment(uid, notebook_type=notebook_instance.notebook_type)
             service_body, service_port = create_service(uid, namespace=namespace)
             secret_body = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id)
             if service_body is None:
