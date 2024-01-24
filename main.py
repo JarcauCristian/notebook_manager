@@ -168,7 +168,8 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
                     "expiration_time": format_expiration_timestamp,
                     "last_accessed": instance.last_accessed.strftime("%m/%d/%Y"),
                     "description": instance.description,
-                    "port": instance.port
+                    "port": instance.port,
+                    "notebook_type": instance.notebook_type
                 }
                 return_data.append(data)
 
@@ -218,7 +219,6 @@ async def delete_notebook(uid: str, authorization: str = Header(None)):
             config.load_incluster_config()
             apps_v1_api = client.AppsV1Api()
             core_v1_api = client.CoreV1Api()
-            networking_v1_api = client.NetworkingV1Api()
 
             session = Session()
 
