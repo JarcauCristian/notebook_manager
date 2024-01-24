@@ -5,7 +5,6 @@ from fastapi import FastAPI, Header
 import datetime
 import requests
 from pydantic import BaseModel
-from dotenv import load_dotenv
 from pod_utils import create_service, create_deployment, create_secret
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -17,7 +16,6 @@ from redis_cache import is_data_stale, get_data_from_redis, set_data_in_redis, u
 
 app = FastAPI()
 Base = declarative_base()
-load_dotenv()
 namespace = os.getenv("NAMESPACE")
 engine = create_engine(f'postgresql+psycopg2://'
                        f'{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@{os.getenv("POSTGRES_HOST")}'
@@ -38,10 +36,10 @@ class MyTable(Base):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
 )
 
 

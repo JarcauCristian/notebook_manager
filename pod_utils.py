@@ -97,15 +97,3 @@ def create_secret(uid: str, dataset_url: str, user_id: str):
         yaml_content["data"]["user_id"] = encoded_user_id_token
 
     return yaml_content
-
-
-def create_ingress(uid: str, port: int):
-    with open("pod/ingress.yaml") as file:
-        yaml_content = yaml.safe_load(file)
-
-        yaml_content["metadata"]["name"] = f"ingress-{uid}"
-        yaml_content["spec"]["rules"][0]["http"]["paths"][0]["path"] = f"/{uid}"
-        yaml_content["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["name"] = f"service-{uid}"
-        yaml_content["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["port"]["number"] = port
-
-    return yaml_content
