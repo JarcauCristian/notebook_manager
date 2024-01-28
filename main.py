@@ -49,13 +49,14 @@ class NotebookInstance(BaseModel):
     dataset_url: str
     notebook_type: str
 
+path = os.getenv("INGRESS_PATH") + "/" if os.getenv("INGRESS_PATH") is not None else ""
 
-@app.get("/")
+@app.get(f"/{path}")
 async def connection_test():
     return JSONResponse("Server Works!", status_code=200)
 
 
-@app.post("/create_notebook_instance", tags=["POST"])
+@app.post(f"/{path}create_notebook_instance", tags=["POST"])
 async def create_notebook_instance(notebook_instance: NotebookInstance, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -120,7 +121,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.get("/get_notebook_details", tags=["GET"])
+@app.get(f"/{path}get_notebook_details", tags=["GET"])
 async def get_notebook_details(user_id: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -186,7 +187,7 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.put("/update_access", tags=["PUT"])
+@app.put(f"/{path}update_access", tags=["PUT"])
 async def update_access(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -208,7 +209,7 @@ async def update_access(uid: str, authorization: str = Header(None)):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.delete("/delete_notebook", tags=["DELETE"])
+@app.delete(f"/{path}delete_notebook", tags=["DELETE"])
 async def delete_notebook(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
