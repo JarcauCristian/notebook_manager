@@ -1,3 +1,4 @@
+import logging
 import os
 import uvicorn
 from uuid import uuid4
@@ -5,7 +6,7 @@ from fastapi import FastAPI, Header
 import datetime
 import requests
 from pydantic import BaseModel
-from pod_utils import create_service, create_deployment, create_secret
+from pod_utils import create_ingress, create_service, create_deployment, create_secret
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from starlette.responses import JSONResponse
@@ -49,14 +50,12 @@ class NotebookInstance(BaseModel):
     dataset_url: str
     notebook_type: str
 
-path = os.getenv("INGRESS_PATH") + "/" if os.getenv("INGRESS_PATH") is not None else ""
-
-@app.get(f"/{path}")
+@app.get("/notebook_manager")
 async def connection_test():
     return JSONResponse("Server Works!", status_code=200)
 
 
-@app.post(f"/{path}create_notebook_instance", tags=["POST"])
+@app.post("/notebook_manager/create_notebook_instance", tags=["POST"])
 async def create_notebook_instance(notebook_instance: NotebookInstance, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -67,6 +66,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             config.load_incluster_config()
             apps_v1_api = client.AppsV1Api()
             core_v1_api = client.CoreV1Api()
+            networking_v1_api = client.NetworkingV1Api()
 
             if notebook_instance.notebook_type not in ["sklearn", "pytorch"]:
                 return JSONResponse(status_code=400, content="Notebook Type can be only sklearn or pytorch!")
@@ -75,14 +75,22 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             deployment_body = create_deployment(uid, notebook_type=notebook_instance.notebook_type)
             service_body, service_port = create_service(uid, namespace=namespace)
             secret_body = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id)
+            ingress_body = create_ingress(uid, service_port)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)
             try:
                 core_v1_api.create_namespaced_secret(namespace=namespace, body=secret_body)
                 apps_v1_api.create_namespaced_deployment(namespace=namespace, body=deployment_body)
                 core_v1_api.create_namespaced_service(namespace=namespace, body=service_body)
+                networking_v1_api.create_namespaced_ingress(namespace=namespace, body=ingress_body)
             except ApiException as e:
                 print(f"Error creating pod {e}")
+
+                try:
+                    networking_v1_api.delete_namespaced_ingress(namespace=namespace, name=f"ingress-{uid}")
+                except ApiException as e:
+                    print("Resource does not exist!")
+
                 try:
                     core_v1_api.delete_namespaced_service(namespace=namespace, name=f"service-{uid}")
                 except ApiException as e:
@@ -110,8 +118,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             session.close()
 
             return_data = {
-                "notebook_id": uid,
-                "port": service_port
+                "notebook_id": uid
             }
 
             return JSONResponse(content=return_data, status_code=201)
@@ -121,7 +128,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.get(f"/{path}get_notebook_details", tags=["GET"])
+@app.get("/notebook_manager/get_notebook_details", tags=["GET"])
 async def get_notebook_details(user_id: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -187,7 +194,7 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.put(f"/{path}update_access", tags=["PUT"])
+@app.put("/notebook_manager/update_access", tags=["PUT"])
 async def update_access(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
@@ -209,50 +216,41 @@ async def update_access(uid: str, authorization: str = Header(None)):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
 
 
-@app.delete(f"/{path}delete_notebook", tags=["DELETE"])
+@app.delete("/notebook_manager/delete_notebook", tags=["DELETE"])
 async def delete_notebook(uid: str, authorization: str = Header(None)):
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1]
+    if not authorization or not authorization.startswith("Bearer "):
+        return JSONResponse(status_code=400, content="Authorization token not provided or invalid")
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
+    token = authorization.split(" ")[1]
+    response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
 
-        if response.status_code == 200:
-            config.load_incluster_config()
-            apps_v1_api = client.AppsV1Api()
-            core_v1_api = client.CoreV1Api()
+    if response.status_code != 200:
+        return JSONResponse(status_code=401, content="Unauthorized access")
 
-            session = Session()
+    config.load_incluster_config()
+    apps_v1_api = client.AppsV1Api()
+    core_v1_api = client.CoreV1Api()
+    networking_v1_api = client.NetworkingV1Api()
 
-            row_to_delete = session.query(MyTable).filter(MyTable.notebook_id == uid).first()
+    with Session() as session:
+        row_to_delete = session.query(MyTable).filter(MyTable.notebook_id == uid).first()
 
-            if row_to_delete:
-                session.delete(row_to_delete)
-                session.commit()
-            else:
-                return JSONResponse(content="Failed to delete notebook!", status_code=500)
+        if not row_to_delete:
+            return JSONResponse(status_code=404, content="Notebook not found")
 
-            session.close()
+        session.delete(row_to_delete)
+        session.commit()
 
-            try:
-                core_v1_api.delete_namespaced_service(namespace=namespace, name=f"service-{uid}")
-            except ApiException as e:
-                print(f"Resource does not exist! {e}")
+    try:
+        networking_v1_api.delete_namespaced_ingress(namespace=namespace, name=f"ingress-{uid}")
+        core_v1_api.delete_namespaced_service(namespace=namespace, name=f"service-{uid}")
+        apps_v1_api.delete_namespaced_deployment(namespace=namespace, name=f"deployment-{uid}")
+        core_v1_api.delete_namespaced_secret(namespace=namespace, name=f"secret-{uid}")
+    except client.exceptions.ApiException as e:
+        logging.error(f"Kubernetes resource deletion error: {e}")
+        return JSONResponse(status_code=500, detail="Error occurred while deleting Kubernetes resources")
 
-            try:
-                apps_v1_api.delete_namespaced_deployment(namespace=namespace, name=f"deployment-{uid}")
-            except ApiException as e:
-                print(f"Resource does not exist! {e}")
-
-            try:
-                core_v1_api.delete_namespaced_secret(namespace=namespace, name=f"secret-{uid}")
-            except ApiException as e:
-                print(f"Resource does not exist! {e}")
-
-            return JSONResponse(content="Deleted Notebook Successfully!", status_code=200)
-        else:
-            return JSONResponse(content="Unauthorized access!", status_code=401)
-    else:
-        return JSONResponse(content="Authorization token not provided!", status_code=400)
+    return JSONResponse(content="Deleted Notebook Successfully", status_code=200)
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0')
