@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import uvicorn
@@ -15,11 +16,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import create_engine, Column, String, DateTime, Integer
 from redis_cache import is_data_stale, get_data_from_redis, set_data_in_redis, update_timestamp
 
-app = FastAPI()
+app = FastAPI(docs_url="/notebook_manager/docs")
 Base = declarative_base()
 namespace = os.getenv("NAMESPACE")
+password = os.getenv("POSTGRES_PASSWORD").strip().replace("\n", "")
 engine = create_engine(f'postgresql+psycopg2://'
-                       f'{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@{os.getenv("POSTGRES_HOST")}'
+                       f'{os.getenv("POSTGRES_USER")}:{password}@{os.getenv("POSTGRES_HOST")}'
                        f':{os.getenv("POSTGRES_PORT")}/{os.getenv("POSTGRES_DB")}')
 Session = sessionmaker(bind=engine)
 
@@ -84,29 +86,18 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
                 core_v1_api.create_namespaced_service(namespace=namespace, body=service_body)
                 networking_v1_api.create_namespaced_ingress(namespace=namespace, body=ingress_body)
             except ApiException as e:
-                print(f"Error creating pod {e}")
+                logging.error(f"Error creating pod {e}")
 
                 try:
                     networking_v1_api.delete_namespaced_ingress(namespace=namespace, name=f"ingress-{uid}")
-                except ApiException as e:
-                    print("Resource does not exist!")
-
-                try:
                     core_v1_api.delete_namespaced_service(namespace=namespace, name=f"service-{uid}")
-                except ApiException as e:
-                    print(f"Resource does not exist! {e}")
-
-                try:
                     apps_v1_api.delete_namespaced_deployment(namespace=namespace, name=f"deployment-{uid}")
-                except ApiException as e:
-                    print(f"Resource does not exist! {e}")
-
-                try:
                     core_v1_api.delete_namespaced_secret(namespace=namespace, name=f"secret-{uid}")
+                    logging.info("Successfully deleted all components")
                 except ApiException as e:
-                    print(f"Resource does not exist! {e}")
+                    logging.error("Could not delete some component!")
 
-                return JSONResponse(content="Could not make notebook!", status_code=500)
+                    return JSONResponse(content="Could not make notebook!", status_code=500)
 
             session = Session()
 
@@ -140,7 +131,7 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
 
         cache_key = f"user_{user_id}_notebook_details"
         if not is_data_stale(cache_key, 3600):  # assuming you want a 1-hour expiration
-            cached_data = get_data_from_redis(cache_key)
+            cached_data = json.loads(get_data_from_redis(cache_key))
             if cached_data:
                 return JSONResponse(content=cached_data, status_code=200)
 
@@ -181,7 +172,7 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
                 }
                 return_data.append(data)
 
-            set_data_in_redis(cache_key, return_data, 3600)
+            set_data_in_redis(cache_key, json.dumps(return_data), 3600)
             update_timestamp(cache_key)
 
             return JSONResponse(content=return_data, status_code=200)
