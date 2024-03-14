@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name:
-        image:
+        image: scr4pp/notebook
         env:
         - name: NOTEBOOK_ID
           valueFrom:
@@ -39,9 +39,20 @@ spec:
             secretKeyRef:
               name:
               key: user_id
+        - name: DATASET_USER
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: dataset_user
+        - name: TARGET_COLUMN
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: target_column
         - name: SERVICE_PORT
           value: "49153"
         - name: API
-          value: "http://go-api-service:49151/get/object"
+          value: "https://ingress.sedimark.work/balancer/get/object"
         ports:
         - containerPort: 8888
+        imagePullPolicy: IfNotPresent

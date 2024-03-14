@@ -34,7 +34,10 @@ class MyTable(Base):
     created_at = Column(DateTime)
     description = Column(String)
     port = Column(Integer)
+    dataset_name = Column(String)
+    dataset_user = Column(String)
     notebook_type = Column(String)
+    target_column = Column(String)
 
 
 app.add_middleware(
@@ -51,6 +54,9 @@ class NotebookInstance(BaseModel):
     description: str
     dataset_url: str
     notebook_type: str
+    dataset_name: str
+    dataset_user: str
+    target_column: str
 
 @app.get("/notebook_manager")
 async def connection_test():
@@ -62,7 +68,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
+        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
 
         if response.status_code == 200:
             config.load_incluster_config()
@@ -70,13 +76,13 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             core_v1_api = client.CoreV1Api()
             networking_v1_api = client.NetworkingV1Api()
 
-            if notebook_instance.notebook_type not in ["sklearn", "pytorch"]:
-                return JSONResponse(status_code=400, content="Notebook Type can be only sklearn or pytorch!")
+            if notebook_instance.notebook_type not in ["classification", "regression"]:
+                return JSONResponse(status_code=400, content="Notebook Type can be only classification or regression!")
 
             uid = str(uuid4())
-            deployment_body = create_deployment(uid, notebook_type=notebook_instance.notebook_type)
+            deployment_body = create_deployment(uid)
             service_body, service_port = create_service(uid, namespace=namespace)
-            secret_body = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id)
+            secret_body, password = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id, notebook_instance.dataset_user, notebook_instance.target_column)
             ingress_body = create_ingress(uid, service_port)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)
@@ -102,14 +108,16 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             session = Session()
 
             new_record = MyTable(user_id=notebook_instance.user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
-                                 created_at=datetime.datetime.now(), description=notebook_instance.description, port=service_port, notebook_type=notebook_instance.notebook_type)
+                                 created_at=datetime.datetime.now(), description=notebook_instance.description, port=service_port, notebook_type=notebook_instance.notebook_type,
+                                 dataset_name=notebook_instance.dataset_name, dataset_user=notebook_instance.dataset_user, target_column=notebook_instance.target_column)
             session.add(new_record)
             session.commit()
 
             session.close()
 
             return_data = {
-                "notebook_id": uid
+                "notebook_id": uid,
+                "password": password
             }
 
             return JSONResponse(content=return_data, status_code=201)
@@ -124,16 +132,10 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
+        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
 
         if response.status_code != 200:
             return JSONResponse(content="Unauthorized access!", status_code=401)
-
-        cache_key = f"user_{user_id}_notebook_details"
-        if not is_data_stale(cache_key, 3600):  # assuming you want a 1-hour expiration
-            cached_data = json.loads(get_data_from_redis(cache_key))
-            if cached_data:
-                return JSONResponse(content=cached_data, status_code=200)
 
         config.load_incluster_config()
 
@@ -168,12 +170,10 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
                     "last_accessed": instance.last_accessed.strftime("%m/%d/%Y"),
                     "description": instance.description,
                     "port": instance.port,
-                    "notebook_type": instance.notebook_type
+                    "notebook_type": instance.notebook_type,
+                    "target_column": instance.target_column
                 }
                 return_data.append(data)
-
-            set_data_in_redis(cache_key, json.dumps(return_data), 3600)
-            update_timestamp(cache_key)
 
             return JSONResponse(content=return_data, status_code=200)
 
@@ -190,7 +190,7 @@ async def update_access(uid: str, authorization: str = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
 
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
+        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
 
         if response.status_code == 200:
             session = Session()
@@ -213,7 +213,7 @@ async def delete_notebook(uid: str, authorization: str = Header(None)):
         return JSONResponse(status_code=400, content="Authorization token not provided or invalid")
 
     token = authorization.split(" ")[1]
-    response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"}, verify=False)
+    response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
 
     if response.status_code != 200:
         return JSONResponse(status_code=401, content="Unauthorized access")

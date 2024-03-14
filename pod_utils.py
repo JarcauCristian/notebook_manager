@@ -2,6 +2,7 @@ import yaml
 import base64
 import random
 import string
+import bcrypt
 from kubernetes import client, config
 
 
@@ -12,7 +13,7 @@ def generate_password(length: int):
     return generated_password
 
 
-def create_deployment(uid: str, notebook_type: str):
+def create_deployment(uid: str):
     with open("pod/deployment.yaml") as file:
         yaml_content = yaml.safe_load(file)
 
@@ -22,21 +23,8 @@ def create_deployment(uid: str, notebook_type: str):
     yaml_content["spec"]["template"]["metadata"]["labels"]["app"] = uid
     yaml_content["spec"]["template"]["spec"]["containers"][0]["name"] = uid
 
-    if notebook_type == "sklearn":
-        yaml_content["spec"]["template"]["spec"]["containers"][0]["image"] = "scr4pp/notebook"
-    elif notebook_type == "pytorch":
-        yaml_content["spec"]["template"]["spec"]["containers"][0]["image"] = "scr4pp/notebook-pytorch"
-
-    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][0]["valueFrom"]["secretKeyRef"]["name"] = \
-        f"secret-{uid}"
-    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][1]["valueFrom"]["secretKeyRef"]["name"] = \
-        f"secret-{uid}"
-    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][2]["valueFrom"]["secretKeyRef"]["name"] = \
-        f"secret-{uid}"
-    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][3]["valueFrom"]["secretKeyRef"]["name"] = \
-        f"secret-{uid}"
-    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][4]["valueFrom"]["secretKeyRef"]["name"] = \
-        f"secret-{uid}"
+    for i in range(6):
+        yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][i]["valueFrom"]["secretKeyRef"]["name"] = f"secret-{uid}"
 
     return yaml_content
 
@@ -74,7 +62,7 @@ def create_service(uid: str, namespace: str):
         return None
 
 
-def create_secret(uid: str, dataset_url: str, user_id: str):
+def create_secret(uid: str, dataset_url: str, user_id: str, dataset_user: str, target_column: str):
     with open("pod/secret.yaml") as file:
         yaml_content = yaml.safe_load(file)
 
@@ -96,7 +84,25 @@ def create_secret(uid: str, dataset_url: str, user_id: str):
         encoded_user_id_token = encoded_user_id_bytes.decode('utf-8')
         yaml_content["data"]["user_id"] = encoded_user_id_token
 
-    return yaml_content
+        encoded_dataset_user_bytes = base64.b64encode(dataset_user.encode('utf-8'))
+        encoded_dataset_user_token = encoded_dataset_user_bytes.decode('utf-8')
+        yaml_content["data"]["dataset_user"] = encoded_dataset_user_token
+
+        encoded_target_column_bytes = base64.b64encode(target_column.encode('utf-8'))
+        encoded_target_column_token = encoded_target_column_bytes.decode('utf-8')
+        yaml_content["data"]["target_column"] = encoded_target_column_token
+
+        username = 'ai1'
+        password = generate_password(8).encode('utf-8')
+
+        hashed_password = bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8')
+
+        auth_string = f"{username}:{hashed_password}"
+
+        encoded_auth_string = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
+        yaml_content["data"]["auth"] = encoded_auth_string
+
+    return yaml_content, password.decode('utf-8')
 
 
 def create_ingress(uid: str, port: int):
@@ -105,6 +111,7 @@ def create_ingress(uid: str, port: int):
 
         yaml_content["metadata"]["name"] = f"ingress-{uid}"
         yaml_content["spec"]["rules"][0]["http"]["paths"][0]["path"] = f"/{uid}"
+        yaml_content["metadata"]["annotations"]["nginx.ingress.kubernetes.io/auth-secret"] = f"secret-{uid}"
         yaml_content["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["name"] = f"service-{uid}"
         yaml_content["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["port"]["number"] = port
 
