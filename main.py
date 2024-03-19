@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import uvicorn
@@ -14,7 +13,6 @@ from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import create_engine, Column, String, DateTime, Integer
-from redis_cache import is_data_stale, get_data_from_redis, set_data_in_redis, update_timestamp
 
 app = FastAPI(docs_url="/notebook_manager/docs")
 Base = declarative_base()
@@ -37,7 +35,6 @@ class MyTable(Base):
     dataset_name = Column(String)
     dataset_user = Column(String)
     notebook_type = Column(String)
-    target_column = Column(String)
 
 
 app.add_middleware(
@@ -105,18 +102,14 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
 
                     return JSONResponse(content="Could not make notebook!", status_code=500)
 
-            session = Session()
-
-            new_record = MyTable(user_id=notebook_instance.user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
-                                 created_at=datetime.datetime.now(), description=notebook_instance.description, port=service_port, notebook_type=notebook_instance.notebook_type,
-                                 dataset_name=notebook_instance.dataset_name, dataset_user=notebook_instance.dataset_user, target_column=notebook_instance.target_column)
-            session.add(new_record)
-            session.commit()
-
-            session.close()
+            with Session() as session:
+                new_record = MyTable(user_id=notebook_instance.user_id, notebook_id=uid, last_accessed=datetime.datetime.now(),
+                                     created_at=datetime.datetime.now(), description=notebook_instance.description, port=service_port, notebook_type=notebook_instance.notebook_type,
+                                     dataset_name=notebook_instance.dataset_name, dataset_user=notebook_instance.dataset_user)
+                session.add(new_record)
+                session.commit()
 
             return_data = {
-                "notebook_id": uid,
                 "password": password
             }
 
@@ -171,18 +164,58 @@ async def get_notebook_details(user_id: str, authorization: str = Header(None)):
                     "description": instance.description,
                     "port": instance.port,
                     "notebook_type": instance.notebook_type,
-                    "target_column": instance.target_column
                 }
                 return_data.append(data)
 
             return JSONResponse(content=return_data, status_code=200)
 
         except client.exceptions.ApiException as e:
+            session.close()
             return JSONResponse(content=f"Exception when calling Kubernetes API: {e}", status_code=500)
         finally:
             session.close()
     else:
         return JSONResponse(content="Authorization token not provided!", status_code=400)
+
+
+@app.get("/notebook_manager/check_notebook_state", tags=["GET"])
+async def check_notebook_state(uid: str, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        return JSONResponse(content="Unauthorized access!", status_code=401) 
+    
+    token = authorization.split(" ")[1]
+
+    response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
+
+    if response.status_code != 200:
+        return JSONResponse(content="Unauthorized access!", status_code=401)
+
+    with Session() as session:
+        result = session.query(MyTable).filter(MyTable.notebook_id == uid).all()
+        if len(result) == 0:
+            return JSONResponse(content="There is no notebook with that id.", status_code=404)
+    
+    config.load_incluster_config()
+
+    core_v1_api = client.CoreV1Api()
+
+    try:
+        pods = core_v1_api.list_namespaced_pod(namespace=namespace)
+        phase = None
+        for pod in pods.items:
+            if uid in pod.metadata.name:
+                phase = pod.status.phase
+                break
+        
+        if phase == "Running":
+            return JSONResponse(content="Notebook is running.", status_code=200)
+        elif phase == "Pending":
+            return JSONResponse(content="Notebook is still creating.", status_code=200)
+        else:
+            return JSONResponse(content="Notebook failed to start.", status_code=200)
+    except ApiException:
+        return JSONResponse(content="Could not read pod metadata.", status_code=500)
+
 
 
 @app.put("/notebook_manager/update_access", tags=["PUT"])
@@ -193,13 +226,11 @@ async def update_access(uid: str, authorization: str = Header(None)):
         response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
 
         if response.status_code == 200:
-            session = Session()
+            with Session() as session:
+                result = session.query(MyTable).filter(MyTable.notebook_id == uid).all()
+                result[0].last_accessed = datetime.datetime.now()
 
-            result = session.query(MyTable).filter(MyTable.notebook_id == uid).all()
-            result[0].last_accessed = datetime.datetime.now()
-
-            session.commit()
-            session.close()
+                session.commit()
             return JSONResponse(content="Update Access Successfully!", status_code=200)
         else:
             return JSONResponse(content="Unauthorized access!", status_code=401)

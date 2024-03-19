@@ -23,7 +23,7 @@ def create_deployment(uid: str):
     yaml_content["spec"]["template"]["metadata"]["labels"]["app"] = uid
     yaml_content["spec"]["template"]["spec"]["containers"][0]["name"] = uid
 
-    for i in range(6):
+    for i in range(12):
         yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][i]["valueFrom"]["secretKeyRef"]["name"] = f"secret-{uid}"
 
     return yaml_content
@@ -71,10 +71,6 @@ def create_secret(uid: str, dataset_url: str, user_id: str, dataset_user: str, t
         encoded_notebook_id_bytes = base64.b64encode(uid.encode('utf-8'))
         encoded_notebook_id = encoded_notebook_id_bytes.decode('utf-8')
         yaml_content["data"]["notebook_id"] = encoded_notebook_id
-
-        encoded_service_name_bytes = base64.b64encode("api-deleter-service".encode('utf-8'))
-        encoded_service_name = encoded_service_name_bytes.decode('utf-8')
-        yaml_content["data"]["service_name"] = encoded_service_name
 
         encoded_dataset_url_bytes = base64.b64encode(dataset_url.encode('utf-8'))
         encoded_dataset_url = encoded_dataset_url_bytes.decode('utf-8')

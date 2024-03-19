@@ -24,11 +24,6 @@ spec:
             secretKeyRef:
               name:
               key: notebook_id
-        - name: SERVICE_NAME
-          valueFrom:
-            secretKeyRef:
-              name:
-              key: service_name
         - name: DATASET_URL
           valueFrom:
             secretKeyRef:
@@ -49,10 +44,55 @@ spec:
             secretKeyRef:
               name:
               key: target_column
+        - name: MLFLOW_TRACKING_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: mlflow_tracking_username
+        - name: MLFLOW_TRACKING_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: mlflow_tracking_password
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: aws_access_key_id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: aws_secret_access_key
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: postgres_user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: postgres_password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: postgres_db
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: "https://minio1.sedimark.work"
+        - name: MLFLOW_TRACKING_URI
+          value: "http://192.168.1.2:10000"
+        - name: POSTGRES_HOST
+          value: "192.168.1.2"
+        - name: POSTGRES_PORT
+          value: "32102"
         - name: SERVICE_PORT
           value: "49153"
+        - name: SERVICE_NAME
+          value: "10.43.193.46"
         - name: API
-          value: "https://ingress.sedimark.work/balancer/get/object"
+          value: "http://10.43.35.119:49151/balancer/get/object"
         ports:
         - containerPort: 8888
         imagePullPolicy: IfNotPresent
