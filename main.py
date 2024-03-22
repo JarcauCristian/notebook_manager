@@ -54,6 +54,7 @@ class NotebookInstance(BaseModel):
     dataset_name: str
     dataset_user: str
     target_column: str
+    model_name: str
 
 @app.get("/notebook_manager")
 async def connection_test():
@@ -79,7 +80,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
             uid = str(uuid4())
             deployment_body = create_deployment(uid)
             service_body, service_port = create_service(uid, namespace=namespace)
-            secret_body, password = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id, notebook_instance.dataset_user, notebook_instance.target_column)
+            secret_body, password = create_secret(uid, notebook_instance.dataset_url, notebook_instance.user_id, notebook_instance.dataset_user, notebook_instance.target_column, notebook_instance.model_name)
             ingress_body = create_ingress(uid, service_port)
             if service_body is None:
                 return JSONResponse(content="Could not deploy a new instance!", status_code=500)

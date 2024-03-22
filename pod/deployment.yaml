@@ -79,6 +79,11 @@ spec:
             secretKeyRef:
               name:
               key: postgres_db
+        - name: MODEL_NAME
+          valueFrom:
+            secretKeyRef:
+              name:
+              key: model_name
         - name: MLFLOW_S3_ENDPOINT_URL
           value: "https://minio1.sedimark.work"
         - name: MLFLOW_TRACKING_URI

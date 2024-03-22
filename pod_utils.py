@@ -23,7 +23,7 @@ def create_deployment(uid: str):
     yaml_content["spec"]["template"]["metadata"]["labels"]["app"] = uid
     yaml_content["spec"]["template"]["spec"]["containers"][0]["name"] = uid
 
-    for i in range(12):
+    for i in range(13):
         yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][i]["valueFrom"]["secretKeyRef"]["name"] = f"secret-{uid}"
 
     return yaml_content
@@ -62,7 +62,7 @@ def create_service(uid: str, namespace: str):
         return None
 
 
-def create_secret(uid: str, dataset_url: str, user_id: str, dataset_user: str, target_column: str):
+def create_secret(uid: str, dataset_url: str, user_id: str, dataset_user: str, target_column: str, model_name: str):
     with open("pod/secret.yaml") as file:
         yaml_content = yaml.safe_load(file)
 
@@ -87,6 +87,10 @@ def create_secret(uid: str, dataset_url: str, user_id: str, dataset_user: str, t
         encoded_target_column_bytes = base64.b64encode(target_column.encode('utf-8'))
         encoded_target_column_token = encoded_target_column_bytes.decode('utf-8')
         yaml_content["data"]["target_column"] = encoded_target_column_token
+
+        encoded_model_name_bytes = base64.b64encode(model_name.encode('utf-8'))
+        encoded_model_name_token = encoded_model_name_bytes.decode('utf-8')
+        yaml_content["data"]["model_name"] = encoded_model_name_token
 
         username = 'ai1'
         password = generate_password(8).encode('utf-8')
