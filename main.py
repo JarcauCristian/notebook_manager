@@ -6,6 +6,7 @@ from fastapi import FastAPI, Header
 import datetime
 import requests
 from pydantic import BaseModel
+from redis_cache import get_data_from_redis, set_data_in_redis, is_data_stale, update_timestamp
 from pod_utils import create_ingress, create_service, create_deployment, create_secret
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -13,6 +14,7 @@ from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import create_engine, Column, String, DateTime, Integer
+
 
 app = FastAPI(docs_url="/notebook_manager/docs")
 Base = declarative_base()
@@ -122,61 +124,70 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
 
 
 @app.get("/notebook_manager/get_notebook_details", tags=["GET"])
-async def get_notebook_details(user_id: str, authorization: str = Header(None)):
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1]
-
-        response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
-
-        if response.status_code != 200:
-            return JSONResponse(content="Unauthorized access!", status_code=401)
-
-        config.load_incluster_config()
-
-        apps_v1_api = client.AppsV1Api()
-
-        session = Session()
-
-        try:
-            instances = session.query(MyTable).filter(MyTable.user_id == user_id).all()
-
-            return_data = []
-
-            for instance in instances:
-                notebook_id = instance.notebook_id
-                try:
-                    deployment = apps_v1_api.read_namespaced_deployment(f"deployment-{notebook_id}",
-                                                                        namespace=namespace)
-
-                    creation_timestamp = deployment.metadata.creation_timestamp
-                    format_creation_timestamp = creation_timestamp.strftime("%m/%d/%Y")
-
-                    expiration_time = creation_timestamp + datetime.timedelta(days=10)
-                    format_expiration_timestamp = expiration_time.strftime("%m/%d/%Y")
-
-                except client.exceptions.ApiException as e:
-                    return JSONResponse(content="Exception when calling Kubernetes API: %s\n" % e, status_code=500)
-
-                data = {
-                    "notebook_id": notebook_id,
-                    "creation_time": format_creation_timestamp,
-                    "expiration_time": format_expiration_timestamp,
-                    "last_accessed": instance.last_accessed.strftime("%m/%d/%Y"),
-                    "description": instance.description,
-                    "port": instance.port,
-                    "notebook_type": instance.notebook_type,
-                }
-                return_data.append(data)
-
-            return JSONResponse(content=return_data, status_code=200)
-
-        except client.exceptions.ApiException as e:
-            session.close()
-            return JSONResponse(content=f"Exception when calling Kubernetes API: {e}", status_code=500)
-        finally:
-            session.close()
-    else:
+async def get_notebook_details(user_id: str, changed: bool = False, authorization: str = Header(None)):
+    if authorization is None or not authorization.startswith("Bearer "):
         return JSONResponse(content="Authorization token not provided!", status_code=400)
+        
+    token = authorization.split(" ")[1]
+
+    response = requests.get(os.getenv("KEYCLOAK_URL"), headers={"Authorization": f"Bearer {token}"})
+
+    if response.status_code != 200:
+        return JSONResponse(content="Unauthorized access!", status_code=401)
+
+    cache_key = f"notebooks_{user_id}"
+    if not is_data_stale(cache_key, 86400) and not changed:
+        cached_data = get_data_from_redis(cache_key)
+        if cached_data:
+            return JSONResponse(content=json.loads(cached_data), status_code=200)
+
+    config.load_incluster_config()
+
+    apps_v1_api = client.AppsV1Api()
+
+    session = Session()
+
+    try:
+        instances = session.query(MyTable).filter(MyTable.user_id == user_id).all()
+
+        return_data = []
+
+        for instance in instances:
+            notebook_id = instance.notebook_id
+            try:
+                deployment = apps_v1_api.read_namespaced_deployment(f"deployment-{notebook_id}",
+                                                                    namespace=namespace)
+
+                creation_timestamp = deployment.metadata.creation_timestamp
+                format_creation_timestamp = creation_timestamp.strftime("%m/%d/%Y")
+
+                expiration_time = creation_timestamp + datetime.timedelta(days=10)
+                format_expiration_timestamp = expiration_time.strftime("%m/%d/%Y")
+
+            except client.exceptions.ApiException as e:
+                return JSONResponse(content="Exception when calling Kubernetes API: %s\n" % e, status_code=500)
+
+            data = {
+                "notebook_id": notebook_id,
+                "creation_time": format_creation_timestamp,
+                "expiration_time": format_expiration_timestamp,
+                "last_accessed": instance.last_accessed.strftime("%m/%d/%Y"),
+                "description": instance.description,
+                "port": instance.port,
+                "notebook_type": instance.notebook_type,
+            }
+            return_data.append(data)
+
+        set_data_in_redis(cache_key, json.dumps(return_data), 86400)
+        update_timestamp(cache_key)
+
+        return JSONResponse(content=return_data, status_code=200)
+
+    except client.exceptions.ApiException as e:
+        session.close()
+        return JSONResponse(content=f"Exception when calling Kubernetes API: {e}", status_code=500)
+    finally:
+        session.close()
 
 
 @app.get("/notebook_manager/check_notebook_state", tags=["GET"])

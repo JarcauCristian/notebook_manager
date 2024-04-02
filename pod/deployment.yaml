@@ -85,9 +85,9 @@ spec:
               name:
               key: model_name
         - name: MLFLOW_S3_ENDPOINT_URL
-          value: "https://minio1.sedimark.work"
+          value: "http://62.72.21.79:9000"
         - name: MLFLOW_TRACKING_URI
-          value: "http://192.168.1.2:10000"
+          value: "http://192.168.1.2:31100"
         - name: POSTGRES_HOST
           value: "192.168.1.2"
         - name: POSTGRES_PORT
