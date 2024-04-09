@@ -1,3 +1,4 @@
+import os
 import yaml
 import base64
 import random
@@ -22,6 +23,10 @@ def create_deployment(uid: str):
     yaml_content["spec"]["selector"]["matchLabels"]["app"] = uid
     yaml_content["spec"]["template"]["metadata"]["labels"]["app"] = uid
     yaml_content["spec"]["template"]["spec"]["containers"][0]["name"] = uid
+    yaml_content["spec"]["template"]["spec"]["containers"][0]["image"] = yaml_content["spec"]["template"]["spec"]["containers"][0]["image"] + ":" + os.getenv("OS_TYPE")
+
+    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][18]["value"] = f'api-deleter-service.{os.getenv("NAMESPACE")}.svc.cluster.local'
+    yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][19]["value"] = f'http://go-api-service.{os.getenv("NAMESPACE")}.svc.cluster.local:49151/balancer/get/object'
 
     for i in range(13):
         yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][i]["valueFrom"]["secretKeyRef"]["name"] = f"secret-{uid}"
