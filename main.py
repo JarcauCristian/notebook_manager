@@ -114,6 +114,7 @@ async def create_notebook_instance(notebook_instance: NotebookInstance, authoriz
                 session.commit()
 
             return_data = {
+                "uid": uid,
                 "password": password
             }
 
