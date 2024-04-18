@@ -97,7 +97,7 @@ def create_secret(uid: str, dataset_url: str, user_id: str, dataset_user: str, t
         encoded_model_name_token = encoded_model_name_bytes.decode('utf-8')
         yaml_content["data"]["model_name"] = encoded_model_name_token
 
-        username = 'ai1'
+        username = uid
         password = generate_password(8).encode('utf-8')
 
         hashed_password = bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8')
