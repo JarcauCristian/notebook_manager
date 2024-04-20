@@ -28,7 +28,7 @@ def create_deployment(uid: str):
     yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][18]["value"] = f'api-deleter-service.{os.getenv("NAMESPACE")}.svc.cluster.local'
     yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][19]["value"] = f'http://go-api-service.{os.getenv("NAMESPACE")}.svc.cluster.local:49151/balancer/get/object'
 
-    for i in range(13):
+    for i in range(8):
         yaml_content["spec"]["template"]["spec"]["containers"][0]["env"][i]["valueFrom"]["secretKeyRef"]["name"] = f"secret-{uid}"
 
     return yaml_content
