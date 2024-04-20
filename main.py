@@ -175,7 +175,7 @@ async def get_notebook_details(user_id: str, changed: bool = False, authorizatio
                 "expiration_time": format_expiration_timestamp,
                 "last_accessed": instance.last_accessed.strftime("%m/%d/%Y"),
                 "description": instance.description,
-                "port": instance.port,
+                "port": int(instance.port),
                 "notebook_type": instance.notebook_type,
             }
             return_data.append(data)
