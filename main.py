@@ -138,7 +138,7 @@ async def get_notebook_details(user_id: str, changed: bool = False, authorizatio
         return JSONResponse(content="Unauthorized access!", status_code=401)
 
     cache_key = f"notebooks_{user_id}"
-    if not is_data_stale(cache_key, 86400) and not changed:
+    if not is_data_stale(cache_key, 300) and not changed:
         cached_data = get_data_from_redis(cache_key)
         if cached_data:
             return JSONResponse(content=json.loads(cached_data), status_code=200)
@@ -180,7 +180,7 @@ async def get_notebook_details(user_id: str, changed: bool = False, authorizatio
             }
             return_data.append(data)
 
-        set_data_in_redis(cache_key, json.dumps(return_data), 86400)
+        set_data_in_redis(cache_key, json.dumps(return_data), 300)
         update_timestamp(cache_key)
 
         return JSONResponse(content=return_data, status_code=200)

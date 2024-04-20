@@ -13,6 +13,7 @@ ENV POSTGRES_PORT = postgres
 ENV POSTGRES_DB = postgres
 ENV NAMESPACE = cjarcau
 ENV KEYCLOAK_URL = https://62.72.21.79:8442/auth/realms/react-keycloak/protocol/openid-connect/userinfo
+ENV OS_TYPE = arm
 
 EXPOSE 8000
 
