@@ -97,10 +97,10 @@ spec:
         - name: POSTGRES_HOST
           valueFrom:
             secretKeyRef:
-              name:  postgres-secret-config
+              name: postgres-secret-config
               key: host
         - name: POSTGRES_PORT
-          value: "49140"
+          value: "32102"
         - name: SERVICE_PORT
           value: "49153"
         - name: SERVICE_NAME
