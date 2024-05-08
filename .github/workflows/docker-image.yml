@@ -1,27 +1,41 @@
-name: Docker Image CI
+name: Create Package
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+  pull_request:
+
+env:
+  IMAGE_NAME: notebook-manager
 
 jobs:
 
-  build:
-
+  push:
     runs-on: ubuntu-latest
-
+    permissions:
+      packages: write
+      contents: read
+      #
     steps:
-    - name: Check out the code
-      uses: actions/checkout@v3
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-    - name: Build image
-      run: docker build . --file Dockerfile --tag scr4pp/kubernetes-api:latest
-    - name: Push Image
-      uses: docker/build-push-action@v2
-      with:
-        push: true
-        tags: scr4pp/kubernetes-api:latest
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker buildx build --platform linux/arm64 . --file Dockerfile --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
+
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        
+      - name: Push image
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+
+
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          [ "$VERSION" == "main" ] && VERSION=latest
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
